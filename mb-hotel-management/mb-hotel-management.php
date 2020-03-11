@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Management Hotel 
+ * Plugin Name: Hotel Management
  * Plugin URI: 
- * Description: You can manage hotel reservations inside your WordPress dashboard with full calendar view.
+ * Description: Manage hotel bookings.
  * Version: 1.0 
  * Author: Dev WordPress
  * Author URI:  
@@ -23,7 +23,8 @@ class managerBooking
 
         // Add extra submenu to the admin panel
         add_action( 'admin_menu', array( $this, 'create_menu_admin_panel' ) );
-
+        add_action( 'wp_ajax_feed_events', array( $this, 'feed_events_func') );
+        add_action( 'wp_ajax_nopriv_feed_events', array( $this, 'feed_events_func' ) );
 
     } // end constructor
 
@@ -43,7 +44,7 @@ class managerBooking
         if (!current_user_can( 'edit_posts' )) {
             wp_die( __('You do not have sufficient permission to access this page.') );
         }
-
+        
         wp_enqueue_style( 'bootstrap', 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' );
         wp_enqueue_style( 'fullcalendar-core', plugins_url( 'lib/fullcalendar/packages/core/main.css', __FILE__ ) );
         wp_enqueue_style( 'fullcalendar-daygrid', plugins_url( 'lib/fullcalendar/packages/daygrid/main.css', __FILE__ ) );
@@ -55,8 +56,56 @@ class managerBooking
         wp_enqueue_script( 'fullcalendar-core', plugins_url( 'lib/fullcalendar/packages/core/main.js', __FILE__ ) );
         wp_enqueue_script( 'fullcalendar-daygrid', plugins_url( 'lib/fullcalendar/packages/daygrid/main.js', __FILE__ ) );
         wp_enqueue_script( 'js-custom', plugins_url( 'js/plugin.js', __FILE__ ) );
+        wp_localize_script( 'js-custom', 'ajaxurl', admin_url('admin-ajax.php') );
 
+        
         include 'inc/front.php';
+    }
+
+    public function feed_events_func(){
+            $args = array(
+            'post_type' => 'booking',
+            'posts_per_page' => -1,
+        );
+
+        $query = new WP_Query( $args );
+
+        if ( $query->have_posts() ) {
+
+            $events = array();
+
+            while( $query->have_posts() ) {  $query->the_post();
+
+                $bookings = get_post_meta( get_the_ID(), 'group_booking', true );
+
+                if ($bookings) {
+                      
+                    foreach ($bookings as $key => $booking) {
+
+                        $room = $booking['room'];
+
+                        $begin = $booking['check_in']; 
+
+                        $end = $booking['check_out']; 
+
+                        $e['title'] = "#".get_the_ID().' '.get_the_title($room);
+                        $e['start'] = $begin;
+                        $e['end'] =  $end;
+                        $e['url'] =  get_edit_post_link(get_the_ID(),'');
+                        $e['classNames'] = 'room-'.$room; 
+                        $e['allDay'] = true;
+
+                        array_push($events, $e);
+                    }
+
+                }
+
+            }
+
+            echo json_encode($events);
+
+        }
+        wp_die();
     }
 
 
